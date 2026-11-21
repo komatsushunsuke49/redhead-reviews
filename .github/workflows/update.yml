@@ -1,0 +1,29 @@
+name: Googleの口コミを更新
+
+on:
+  schedule:
+    # 毎日 6:05 JST（21:05 UTC）。GitHubの定時実行は遅れることがあるが、1日1回なので問題ない
+    - cron: '5 21 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 口コミの評価と件数を取ってくる
+        env:
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+        run: python3 update.py
+      - name: 変わっていたら保存する
+        run: |
+          # 日付だけの変化でも保存する（サイトの「◯月◯日時点」を最新にするため）
+          if git diff --quiet reviews.json; then echo "変化なし"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reviews.json
+          git commit -m "⭐ 口コミ更新: $(python3 -c "import json;d=json.load(open('reviews.json'));print(f\"★{d['rating']}・{d['count']}件 {d['updated']}\")")"
+          git push
